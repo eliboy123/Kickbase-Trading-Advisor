@@ -5,7 +5,6 @@ from kickbase_api.league import (
 )
 from kickbase_api.manager import (
     get_managers,
-    get_manager_performance,
     get_manager_info,
 )
 from kickbase_api.others import get_achievement_reward
@@ -41,18 +40,25 @@ def calc_manager_budgets(token, league_id, league_start_date, start_budget):
     except Exception as e:
         raise RuntimeError(f"Failed to fetch managers: {e}")
 
+    # The league ranking exposes current-season points (sp).
+    # Avoid the stale hard-coded season ID in get_manager_performance.
+    ranking_points = dict(get_league_ranking(token, league_id))
     performances = []
-    for manager in managers:
+    for manager_name, manager_id in managers:
         try:
-            manager_name, manager_id = manager
             info = get_manager_info(token, league_id, manager_id)
             team_value = info.get("tv", 0)
-
-            perf = get_manager_performance(token, league_id, manager_id, manager_name)
-            perf["Team Value"] = team_value
-            performances.append(perf)
+            points = ranking_points.get(manager_name)
+            if points is None:
+                print(f"Warning: No season points found for {manager_name}; using zero")
+                points = 0
+            performances.append({
+                "name": manager_name,
+                "tp": points,
+                "Team Value": team_value,
+            })
         except Exception as e:
-            print(f"Warning: Skipping manager {manager}: {e}")
+            print(f"Warning: Skipping manager {(manager_name, manager_id)}: {e}")
 
     perf_df = pd.DataFrame(performances)
     if not perf_df.empty:
