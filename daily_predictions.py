@@ -1,4 +1,4 @@
-from features.predictions.predictions import live_data_predictions, join_current_market, join_current_squad
+from features.predictions.predictions import live_data_predictions, join_current_market, join_current_squad, estimate_start_11_from_minutes
 from features.predictions.preprocessing import preprocess_player_data, split_data
 from features.predictions.modeling import train_model, evaluate_model
 from kickbase_api.league import get_league_id
@@ -96,13 +96,17 @@ print(f"\nModel evaluation:\nSigns correct: {signs_percent:.2f}%\nRMSE: {rmse:.2
 # Make live data predictions
 live_predictions_df = live_data_predictions(today_df, model, features)
 
+# Recent playing-time heuristic, not the official starting-XI probability.
+start_estimates = estimate_start_11_from_minutes(player_df)
+print("\\nStart XI estimate: share of last completed matches with 60+ minutes (proxy only).")
+
 # Join with current available players on the market
-market_recommendations_df = join_current_market(token, league_id, live_predictions_df)
+market_recommendations_df = join_current_market(token, league_id, live_predictions_df, start_estimates)
 print("\n=== Market Recommendations ===")
 display(market_recommendations_df)
 
 # Join with current players on the team
-squad_recommendations_df = join_current_squad(token, league_id, live_predictions_df)
+squad_recommendations_df = join_current_squad(token, league_id, live_predictions_df, start_estimates)
 print("\n=== Squad Recommendations ===")
 display(squad_recommendations_df)
 
