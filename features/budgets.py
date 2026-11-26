@@ -24,15 +24,25 @@ def calc_manager_budgets(token, league_id, league_start_date, start_budget):
     total_login_bonus = sum(entry.get("data", {}).get("bn", 0) for entry in login_bonus)
 
     total_achievement_bonus = 0
+    unknown_achievement_bonus_count = 0
     for item in achievement_bonus:
         try:
             a_id = item.get("data", {}).get("t")
             if a_id is None:
                 continue
             amount, reward = get_achievement_reward(token, league_id, a_id)
+            if amount is None or reward is None:
+                unknown_achievement_bonus_count += 1
+                continue
             total_achievement_bonus += amount * reward
         except Exception as e:
             print(f"Warning: Failed to process achievement bonus {item}: {e}")
+
+    if unknown_achievement_bonus_count:
+        print(
+            f"Warning: {unknown_achievement_bonus_count} achievement bonus events "
+            "have no verified Euro reward in the API; excluded from budget estimates."
+        )
 
     # Manager performances
     try:
