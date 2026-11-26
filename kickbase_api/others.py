@@ -52,7 +52,10 @@ def get_achievement_reward(token, league_id, achievement_id):
     url = f"{BASE_URL}/leagues/{league_id}/user/achievements/{achievement_id}"
     data = get_json_with_token(url, token)
 
-    amount = data["ac"]
-    reward = data["er"]
-
+    # The current Kickbase API sometimes omits "er" (Euro reward).
+    # Do not invent a monetary amount when it is absent.
+    amount = data.get("ac")
+    reward = data.get("er")
+    if amount is None or reward is None:
+        return None, None
     return amount, reward
