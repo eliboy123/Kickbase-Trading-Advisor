@@ -33,7 +33,32 @@ def live_data_predictions(today_df, model, features):
     return today_df_results
 
 
-def join_current_squad(token, league_id, today_df_results):
+def estimate_start_11_from_minutes(player_df, last_games=5):
+    """Heuristic only: share of the last completed matchdays with >=60 minutes.
+
+    This is not the official Kickbase starting-XI probability and cannot
+    reliably distinguish starters from substitute appearances.
+    """
+    games = player_df[["player_id", "md", "mp"]].copy()
+    games["md"] = pd.to_datetime(games["md"], errors="coerce")
+    games["mp"] = pd.to_numeric(games["mp"], errors="coerce")
+    today = pd.Timestamp(datetime.now(ZoneInfo("Europe/Berlin")).date())
+    games = games[(games["md"] < today) & games["md"].notna() & games["mp"].notna()]
+    games = games.sort_values(["player_id", "md"]).drop_duplicates(
+        subset=["player_id", "md"], keep="last"
+    )
+    games = games.groupby("player_id", group_keys=False).tail(last_games)
+    result = games.groupby("player_id")["mp"].agg(
+        observed_games="count",
+        sixty_min_games=lambda minutes: (minutes >= 60).sum(),
+    ).reset_index()
+    result["start_11_est_pct"] = (
+        100 * result["sixty_min_games"] / result["observed_games"]
+    ).round(0)
+    return result[["player_id", "start_11_est_pct", "observed_games"]]
+
+
+def join_current_squad(token, league_id, today_df_results, start_estimates=None):
     squad_players = get_players_in_squad(token, league_id)
 
     squad_df = pd.DataFrame(squad_players["it"])
@@ -55,14 +80,22 @@ def join_current_squad(token, league_id, today_df_results):
     # Rename "mv_x" to "mv" for better understanding
     squad_df = squad_df.rename(columns={"mv_x": "mv"})
 
-    # Keep only relevant columns
-    squad_df = squad_df[["last_name", "team_name", "mv", "mv_change_yesterday", "predicted_mv_target", "s_11_prob"]]
+    if start_estimates is not None:
+        squad_df = squad_df.merge(start_estimates, on="player_id", how="left")
+    else:
+        squad_df["start_11_est_pct"] = np.nan
+        squad_df["observed_games"] = np.nan
+
+    # Keep official and heuristic estimates separate.
+    squad_df = squad_df[["last_name", "team_name", "mv", "mv_change_yesterday",
+                         "predicted_mv_target", "s_11_prob",
+                         "start_11_est_pct", "observed_games"]]
 
     return squad_df 
 
 
 # TODO Add fail-safe check before player expires if the prob (starting 11) is still high, so no injuries or anything. if it dropped. dont bid / reccommend
-def join_current_market(token, league_id, today_df_results):
+def join_current_market(token, league_id, today_df_results, start_estimates=None):
     """Join the live predictions with the current market data to get bid recommendations"""
 
     players_on_market = get_league_players_on_market(token, league_id)
@@ -101,7 +134,15 @@ def join_current_market(token, league_id, today_df_results):
     # Rename mv_change_1d to mv_change_yesterday for better understanding
     bid_df = bid_df.rename(columns={"mv_change_1d": "mv_change_yesterday"})
 
-    # Keep only relevant columns
-    bid_df = bid_df[["last_name", "team_name", "mv", "mv_change_yesterday", "predicted_mv_target", "s_11_prob", "hours_to_exp", "expiring_today"]]
+    if start_estimates is not None:
+        bid_df = bid_df.merge(start_estimates, on="player_id", how="left")
+    else:
+        bid_df["start_11_est_pct"] = np.nan
+        bid_df["observed_games"] = np.nan
+
+    # Keep official and heuristic estimates separate.
+    bid_df = bid_df[["last_name", "team_name", "mv", "mv_change_yesterday",
+                     "predicted_mv_target", "s_11_prob", "start_11_est_pct",
+                     "observed_games", "hours_to_exp", "expiring_today"]]
 
     return bid_df
