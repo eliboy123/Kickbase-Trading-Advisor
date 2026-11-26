@@ -157,7 +157,7 @@ def save_player_data_to_db(token, competition_ids, last_mv_values, last_pfm_valu
                 return merged_df
 
             # Use ThreadPoolExecutor to parallelize player fetching
-            with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 comp_dfs = list(executor.map(process_player, players))
             
             comp_final_df = pd.concat(
