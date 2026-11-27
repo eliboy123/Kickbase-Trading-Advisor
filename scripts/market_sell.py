@@ -50,6 +50,9 @@ def main():
     parser.add_argument("--confirmation", default="")
     args = parser.parse_args()
 
+    if args.mode == "list":
+        raise RuntimeError("DISABLED: this API endpoint instantly sells players to Kickbase. No listing endpoint verified.")
+
     if args.mode == "list" and args.confirmation != "LIST PLAYER":
         parser.error("Live listing requires confirmation LIST PLAYER")
 
