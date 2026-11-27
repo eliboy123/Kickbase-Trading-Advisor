@@ -230,3 +230,82 @@ def join_current_market(token, league_id, today_df_results, start_estimates=None
                      "availability_code"]]
 
     return bid_df
+
+def full_market_inventory(token, league_id, predictions_df, start_estimates=None,
+                          point_stats=None):
+    """List ALL listings from the live Kickbase league market.
+
+    Keep offers without model predictions, including negative forecasts.
+    Details for players without cached model data are fetched read-only.
+    A missing detail or status remains explicitly unknown.
+    """
+    from kickbase_api.config import BASE_URL, get_json_with_token
+
+    offers = get_league_players_on_market(token, league_id)
+    columns = [
+        "player_id", "last_name", "team_name", "position", "mv",
+        "predicted_mv_target", "last5_avg_points", "last5_games_recorded",
+        "start_11_est_pct", "hours_to_exp", "offer_type",
+        "availability_status", "availability_note",
+    ]
+    if not offers:
+        return pd.DataFrame(columns=columns)
+
+    market = pd.DataFrame(offers)
+    market["player_id"] = market["id"].astype(str)
+    predictions = predictions_df.copy()
+    predictions["player_id"] = predictions["player_id"].astype(str)
+    predictions = predictions.sort_values("date").drop_duplicates("player_id", keep="last")
+    inventory = market.merge(predictions, on="player_id", how="left", suffixes=("_offer", ""))
+
+    if start_estimates is not None:
+        estimates = start_estimates.copy()
+        estimates["player_id"] = estimates["player_id"].astype(str)
+        inventory = inventory.merge(
+            estimates.drop_duplicates("player_id"), on="player_id", how="left"
+        )
+    else:
+        inventory["start_11_est_pct"] = np.nan
+
+    if point_stats is not None:
+        points = point_stats.copy()
+        points["player_id"] = points["player_id"].astype(str)
+        inventory = inventory.merge(
+            points[["player_id", "last5_avg_points", "last5_games_recorded"]]
+            .drop_duplicates("player_id"), on="player_id", how="left"
+        )
+    else:
+        inventory["last5_avg_points"] = np.nan
+        inventory["last5_games_recorded"] = np.nan
+
+    # Not every offered player has recent model data. Fetch missing metadata
+    # individually, without changing any roster or transfer state.
+    for idx in inventory.index[inventory["last_name"].isna()]:
+        pid = inventory.at[idx, "player_id"]
+        try:
+            detail = get_json_with_token(
+                f"{BASE_URL}/competitions/1/players/{pid}", token
+            )
+            inventory.at[idx, "last_name"] = detail.get("ln")
+            inventory.at[idx, "team_name"] = detail.get("tn")
+            inventory.at[idx, "position"] = detail.get("pos")
+            if pd.isna(inventory.at[idx, "mv"]):
+                inventory.at[idx, "mv"] = detail.get("mv")
+        except Exception as exc:
+            print(f"Cannot retrieve details for offered player {pid}: {type(exc).__name__}")
+        if pd.isna(inventory.at[idx, "last_name"]):
+            inventory.at[idx, "last_name"] = f"Unbekannt (ID {pid})"
+
+    inventory["hours_to_exp"] = pd.to_numeric(inventory["exp"], errors="coerce") / 3600
+    inventory["offer_type"] = np.where(
+        inventory["hours_to_exp"].notna(), "Kickbase-Auktion", "P2P / kein Ablaufdatum"
+    )
+    inventory = inventory.merge(
+        get_current_availability(token, inventory["player_id"]),
+        on="player_id", how="left"
+    )
+    inventory["availability_status"] = inventory["availability_status"].fillna("Unbekannt")
+    inventory = inventory.sort_values(
+        ["predicted_mv_target", "last_name"], ascending=[False, True], na_position="last"
+    )
+    return inventory[columns].reset_index(drop=True)
