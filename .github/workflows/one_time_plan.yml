@@ -1,0 +1,52 @@
+name: One-time Kickbase Transfer Plan
+on:
+  push:
+    paths:
+      - '.github/one-time-transfer-request.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: one-time-kickbase-plan
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      KICK_USER: ${{ secrets.KICK_USER }}
+      KICK_PASS: ${{ secrets.KICK_PASS }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Bid 11.65m on Simpson-Pusey
+        id: bid_simpson
+        continue-on-error: true
+        run: python -m scripts.market_bid --player "Simpson-Pusey" --amount 11650000 --mode place --confirmation "PLACE BID"
+      - name: Bid 4.15m on Keitel
+        id: bid_keitel
+        continue-on-error: true
+        run: python -m scripts.market_bid --player "Keitel" --amount 4150000 --mode place --confirmation "PLACE BID"
+      - name: List Karetsas (do NOT accept offers)
+        id: list_karetsas
+        continue-on-error: true
+        run: python -m scripts.market_sell --player "Karetsas" --mode list --confirmation "LIST PLAYER"
+      - name: List Maluze (do NOT accept offers)
+        id: list_maluze
+        continue-on-error: true
+        run: python -m scripts.market_sell --player "Maluze" --mode list --confirmation "LIST PLAYER"
+      - name: Record execution results
+        if: always()
+        run: |
+          echo "Bid Simpson-Pusey: ${{ steps.bid_simpson.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Bid Keitel: ${{ steps.bid_keitel.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "List Karetsas: ${{ steps.list_karetsas.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "List Maluze: ${{ steps.list_maluze.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "No offers are accepted and no players are immediately sold by this workflow." >> "$GITHUB_STEP_SUMMARY"
