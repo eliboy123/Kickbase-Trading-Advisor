@@ -1,0 +1,38 @@
+name: One-time Kickbase Player Listings
+on:
+  push:
+    paths:
+      - '.github/one-time-listing-request.txt'
+permissions:
+  contents: read
+concurrency:
+  group: one-time-kickbase-listing
+  cancel-in-progress: false
+jobs:
+  list:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      KICK_USER: ${{ secrets.KICK_USER }}
+      KICK_PASS: ${{ secrets.KICK_PASS }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: List Karetsas without accepting offers
+        id: karetsas
+        continue-on-error: true
+        run: python -m scripts.market_sell --player Karetsas --mode list --confirmation "LIST PLAYER"
+      - name: List Maluze without accepting offers
+        id: maluze
+        continue-on-error: true
+        run: python -m scripts.market_sell --player Maluze --mode list --confirmation "LIST PLAYER"
+      - name: Summarize
+        if: always()
+        run: |
+          echo "Karetsas: ${{ steps.karetsas.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Maluze: ${{ steps.maluze.outcome }}" >> "$GITHUB_STEP_SUMMARY"
