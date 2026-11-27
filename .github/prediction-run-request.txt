@@ -1,1 +1,1 @@
-Request run #8: refresh and analyze current Kickbase predictions on 2026-11-27. No trades or listings.
+Request run #12 on 2026-11-27. Analysis and injury status only; no trades.
