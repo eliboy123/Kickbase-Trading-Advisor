@@ -1,6 +1,9 @@
 name: Run Daily Predictions
 
 on:
+  push:
+    paths:
+      - '.github/prediction-run-request.txt'
   schedule:
     - cron: '30 21 * * *'  # Runs every day at 22:30 UTC
   workflow_dispatch:
