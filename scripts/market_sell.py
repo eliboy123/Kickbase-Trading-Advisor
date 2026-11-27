@@ -18,24 +18,27 @@ def normalize(text):
     return " ".join(unicodedata.normalize("NFKC", str(text)).casefold().split())
 
 
-def identify_player(squad, requested):
+def identify_player(squad, requested, token):
     matches = []
     for item in squad:
         identifier = item.get("i")
         if identifier is None:
             continue
-        first = item.get("fn") or ""
-        last = item.get("ln") or ""
+        # The squad response may omit first/last name fields.
+        info = get_json_with_token(
+            f"{BASE_URL}/competitions/1/players/{identifier}", token
+        )
+        first = info.get("fn") or ""
+        last = info.get("ln") or ""
         full = f"{first} {last}".strip()
         if (normalize(requested) == normalize(str(identifier))
                 or normalize(requested) == normalize(full)
                 or (last and normalize(requested) == normalize(last))):
-            matches.append((identifier, full, item))
+            matches.append((identifier, full, info))
     if len(matches) != 1:
         raise RuntimeError(
             f"Expected exactly one player in your squad matching {requested!r}; "
-            f"found {len(matches)}. No player listed. "
-            "Use the exact full name or player ID."
+            f"found {len(matches)}. No player listed."
         )
     return matches[0]
 
@@ -67,7 +70,7 @@ def main():
     league_id = matching[0]["i"]
 
     data = get_players_in_squad(token, league_id)
-    player_id, full_name, item = identify_player(data.get("it", []), args.player)
+    player_id, full_name, item = identify_player(data.get("it", []), args.player, token)
 
     # Prevent duplicate listings if already present in active market data.
     market = get_json_with_token(f"{BASE_URL}/leagues/{league_id}/market", token)
