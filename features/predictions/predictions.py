@@ -58,7 +58,63 @@ def estimate_start_11_from_minutes(player_df, last_games=5):
     return result[["player_id", "start_11_est_pct", "observed_games"]]
 
 
-def join_current_squad(token, league_id, today_df_results, start_estimates=None):
+
+def calculate_kickbase_points(player_df, season_start="2026-08-01", last_games=5):
+    """Summarize actual completed-match Kickbase points from cached performance data.
+
+    Performance points (p) are merged onto multiple daily market-value rows.
+    Deduplicate each player's match date before summing, or scores are inflated.
+    The figures cover only matches available in our cached performance history,
+    not an independently verified official Kickbase season total.
+    """
+    games = player_df[["player_id", "md", "p", "mp"]].copy()
+    games["md"] = pd.to_datetime(games["md"], errors="coerce")
+    games["p"] = pd.to_numeric(games["p"], errors="coerce")
+    games["mp"] = pd.to_numeric(games["mp"], errors="coerce")
+    today = pd.Timestamp(datetime.now(ZoneInfo("Europe/Berlin")).date())
+    start = pd.Timestamp(season_start)
+    games = games[
+        games["md"].notna()
+        & (games["md"] >= start)
+        & (games["md"] < today)
+        & games["p"].notna()
+    ]
+    games = (
+        games.sort_values(["player_id", "md"])
+        .drop_duplicates(subset=["player_id", "md"], keep="last")
+    )
+    if games.empty:
+        return pd.DataFrame(columns=[
+            "player_id", "season_points_cached", "season_games_recorded",
+            "season_avg_points", "last5_points", "last5_avg_points",
+            "last5_games_recorded"
+        ])
+
+    seasonal = games.groupby("player_id")["p"].agg(
+        season_points_cached="sum",
+        season_games_recorded="count",
+        season_avg_points="mean"
+    ).reset_index()
+
+    recent = (
+        games.sort_values(["player_id", "md"])
+        .groupby("player_id", group_keys=False)
+        .tail(last_games)
+        .groupby("player_id")["p"]
+        .agg(
+            last5_points="sum",
+            last5_avg_points="mean",
+            last5_games_recorded="count"
+        )
+        .reset_index()
+    )
+    result = seasonal.merge(recent, on="player_id", how="left")
+    for column in ("season_avg_points", "last5_avg_points"):
+        result[column] = result[column].round(1)
+    return result
+
+
+def join_current_squad(token, league_id, today_df_results, start_estimates=None, point_stats=None):
     squad_players = get_players_in_squad(token, league_id)
 
     squad_df = pd.DataFrame(squad_players["it"])
@@ -86,10 +142,21 @@ def join_current_squad(token, league_id, today_df_results, start_estimates=None)
         squad_df["start_11_est_pct"] = np.nan
         squad_df["observed_games"] = np.nan
 
+    if point_stats is not None:
+        squad_df = squad_df.merge(point_stats, on="player_id", how="left")
+    else:
+        for column in ("season_points_cached", "season_games_recorded",
+                       "season_avg_points", "last5_points", "last5_avg_points",
+                       "last5_games_recorded"):
+            squad_df[column] = np.nan
+
     # Keep official and heuristic estimates separate.
     squad_df = squad_df[["last_name", "team_name", "mv", "mv_change_yesterday",
                          "predicted_mv_target", "s_11_prob",
-                         "start_11_est_pct", "observed_games"]]
+                         "start_11_est_pct", "observed_games",
+                         "season_points_cached", "season_games_recorded",
+                         "season_avg_points", "last5_points",
+                         "last5_avg_points", "last5_games_recorded"]]
 
     return squad_df 
 
