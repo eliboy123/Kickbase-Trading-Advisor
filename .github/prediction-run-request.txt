@@ -1,1 +1,1 @@
-Request run #12 on 2026-11-27. Analysis and injury status only; no trades.
+Request read-only prediction check of listing prices (prc) on 2026-11-27. No trades or listings.
