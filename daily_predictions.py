@@ -1,4 +1,4 @@
-from features.predictions.predictions import live_data_predictions, join_current_market, join_current_squad, estimate_start_11_from_minutes, calculate_kickbase_points
+from features.predictions.predictions import live_data_predictions, join_current_market, join_current_squad, estimate_start_11_from_minutes, calculate_kickbase_points, full_market_inventory
 from features.predictions.preprocessing import preprocess_player_data, split_data
 from features.predictions.modeling import train_model, evaluate_model
 from kickbase_api.league import get_league_id
@@ -100,6 +100,16 @@ live_predictions_df = live_data_predictions(today_df, model, features)
 start_estimates = estimate_start_11_from_minutes(player_df)
 point_stats = calculate_kickbase_points(player_df)
 print("\\nStart XI estimate: share of last completed matches with 60+ minutes (proxy only).")
+
+# Unfiltered live market inventory: shows ALL Kickbase offers, even if
+# their model forecast is negative or unavailable.
+full_market_df = full_market_inventory(
+    token, league_id, live_predictions_df, start_estimates, point_stats
+)
+print("\\n=== FULL MARKET (UNFILTERED) ===")
+print(f"Total Kickbase market listings: {len(full_market_df)}")
+display(full_market_df)
+print("Missing model forecasts are shown as NaN, not silently removed.")
 
 # Join with current available players on the market
 market_recommendations_df = join_current_market(token, league_id, live_predictions_df, start_estimates)
