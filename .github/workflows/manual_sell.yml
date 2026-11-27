@@ -1,0 +1,49 @@
+name: Manual Kickbase Sell
+
+on:
+  workflow_dispatch:
+    inputs:
+      player:
+        description: Exact player name or player ID in your squad
+        required: true
+        type: string
+      mode:
+        description: Preview does not change Kickbase; list submits a real market listing
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - list
+      confirmation:
+        description: For live listing enter LIST PLAYER
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-kickbase-sell
+  cancel-in-progress: false
+
+jobs:
+  sell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: Preview or list one squad player
+        env:
+          KICK_USER: ${{ secrets.KICK_USER }}
+          KICK_PASS: ${{ secrets.KICK_PASS }}
+          PLAYER: ${{ inputs.player }}
+          MODE: ${{ inputs.mode }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          python scripts/market_sell.py --player "$PLAYER" --mode "$MODE" --confirmation "$CONFIRMATION"
