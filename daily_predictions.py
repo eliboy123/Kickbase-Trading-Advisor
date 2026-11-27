@@ -1,4 +1,4 @@
-from features.predictions.predictions import live_data_predictions, join_current_market, join_current_squad, estimate_start_11_from_minutes
+from features.predictions.predictions import live_data_predictions, join_current_market, join_current_squad, estimate_start_11_from_minutes, calculate_kickbase_points
 from features.predictions.preprocessing import preprocess_player_data, split_data
 from features.predictions.modeling import train_model, evaluate_model
 from kickbase_api.league import get_league_id
@@ -98,6 +98,7 @@ live_predictions_df = live_data_predictions(today_df, model, features)
 
 # Recent playing-time heuristic, not the official starting-XI probability.
 start_estimates = estimate_start_11_from_minutes(player_df)
+point_stats = calculate_kickbase_points(player_df)
 print("\\nStart XI estimate: share of last completed matches with 60+ minutes (proxy only).")
 
 # Join with current available players on the market
@@ -106,9 +107,23 @@ print("\n=== Market Recommendations ===")
 display(market_recommendations_df)
 
 # Join with current players on the team
-squad_recommendations_df = join_current_squad(token, league_id, live_predictions_df, start_estimates)
+squad_recommendations_df = join_current_squad(token, league_id, live_predictions_df, start_estimates, point_stats)
 print("\n=== Squad Recommendations ===")
 display(squad_recommendations_df)
+
+# Ranking of weakest recent point scorers in the current squad.
+# No transfers are triggered by this report.
+print("\\n=== Squad: Lowest Kickbase Points (Last 5 Recorded Matches) ===")
+low_points_df = squad_recommendations_df.sort_values(
+    ["last5_avg_points", "season_avg_points"], ascending=[True, True],
+    na_position="last"
+)
+display(low_points_df[[
+    "last_name", "team_name", "last5_avg_points", "last5_points",
+    "last5_games_recorded", "season_avg_points", "season_points_cached",
+    "season_games_recorded", "start_11_est_pct"
+]])
+print("Points are based on completed matchdays in the cached performance data, not live official totals.")
 
 # Send email with recommendations
 send_mail(manager_budgets_df, market_recommendations_df, squad_recommendations_df, email)
