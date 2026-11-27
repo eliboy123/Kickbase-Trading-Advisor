@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import pandas as pd
 import numpy as np
+from features.predictions.availability import get_current_availability
 
 def live_data_predictions(today_df, model, features):
     """Make live data predictions for today_df using the trained model"""
@@ -150,13 +151,21 @@ def join_current_squad(token, league_id, today_df_results, start_estimates=None,
                        "last5_games_recorded"):
             squad_df[column] = np.nan
 
+    # Read current injury/fitness/suspension status, distinct from minute heuristics.
+    squad_df = squad_df.merge(
+        get_current_availability(token, squad_df["player_id"]),
+        on="player_id", how="left"
+    )
+
     # Keep official and heuristic estimates separate.
     squad_df = squad_df[["last_name", "team_name", "mv", "mv_change_yesterday",
                          "predicted_mv_target", "s_11_prob",
                          "start_11_est_pct", "observed_games",
                          "season_points_cached", "season_games_recorded",
                          "season_avg_points", "last5_points",
-                         "last5_avg_points", "last5_games_recorded"]]
+                         "last5_avg_points", "last5_games_recorded",
+                         "availability_status", "availability_note",
+                         "availability_code"]]
 
     return squad_df 
 
@@ -207,9 +216,17 @@ def join_current_market(token, league_id, today_df_results, start_estimates=None
         bid_df["start_11_est_pct"] = np.nan
         bid_df["observed_games"] = np.nan
 
+    # Fetch only current market candidates, not the whole player database.
+    bid_df = bid_df.merge(
+        get_current_availability(token, bid_df["player_id"]),
+        on="player_id", how="left"
+    )
+
     # Keep official and heuristic estimates separate.
     bid_df = bid_df[["last_name", "team_name", "mv", "mv_change_yesterday",
                      "predicted_mv_target", "s_11_prob", "start_11_est_pct",
-                     "observed_games", "hours_to_exp", "expiring_today"]]
+                     "observed_games", "hours_to_exp", "expiring_today",
+                     "availability_status", "availability_note",
+                     "availability_code"]]
 
     return bid_df
