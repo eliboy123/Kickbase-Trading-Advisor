@@ -244,7 +244,7 @@ def full_market_inventory(token, league_id, predictions_df, start_estimates=None
     offers = get_league_players_on_market(token, league_id)
     columns = [
         "player_id", "last_name", "team_name", "position", "mv",
-        "predicted_mv_target", "last5_avg_points", "last5_games_recorded",
+        "listing_price", "predicted_mv_target", "last5_avg_points", "last5_games_recorded",
         "start_11_est_pct", "hours_to_exp", "offer_type",
         "availability_status", "availability_note",
     ]
