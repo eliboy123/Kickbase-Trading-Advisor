@@ -79,6 +79,8 @@ def get_league_players_on_market(token, league_id):
             'id': player.get('i'),
             'prob': player.get('prob'),
             "exp": player.get("exs"),
+            # Actual listing/asking price, distinct from market value.
+            "listing_price": player.get("prc"),
         })
 
     return result
