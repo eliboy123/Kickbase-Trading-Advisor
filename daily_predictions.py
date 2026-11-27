@@ -111,6 +111,21 @@ squad_recommendations_df = join_current_squad(token, league_id, live_predictions
 print("\n=== Squad Recommendations ===")
 display(squad_recommendations_df)
 
+# Fitness codes are fetched live on each run, independent of historic minutes.
+# A missing/unknown code must never be interpreted as a healthy player.
+print("\\n=== Current Injury / Suspension Status (Squad) ===")
+display(squad_recommendations_df[[
+    "last_name", "team_name", "availability_status", "availability_note",
+    "start_11_est_pct"
+]])
+print("\\n=== Current Injury / Suspension Status (Market) ===")
+display(market_recommendations_df[[
+    "last_name", "team_name", "availability_status", "availability_note",
+    "hours_to_exp"
+]])
+print("Kickbase st/stxt status only; 'Kein Ausfall gemeldet' does NOT guarantee a start.")
+print("Unknown means unavailable or unrecognized status. Always verify near kickoff.")
+
 # Ranking of weakest recent point scorers in the current squad.
 # No transfers are triggered by this report.
 print("\\n=== Squad: Lowest Kickbase Points (Last 5 Recorded Matches) ===")
