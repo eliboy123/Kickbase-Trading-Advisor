@@ -48,7 +48,7 @@ def get_current_availability(token, player_ids, competition_id=1):
     unique_ids = pd.to_numeric(pd.Series(list(player_ids)), errors="coerce").dropna()
     for player_id in unique_ids.astype("int64").drop_duplicates():
         item = {
-            "player_id": int(player_id),
+            "player_id": str(int(player_id)),
             "availability_status": "Unbekannt",
             "availability_note": None,
             "availability_code": None,
@@ -73,6 +73,9 @@ def get_current_availability(token, player_ids, competition_id=1):
         except Exception as exc:
             print(f"Availability unavailable for player {int(player_id)}: {type(exc).__name__}")
         rows.append(item)
-    return pd.DataFrame(rows, columns=[
+    result = pd.DataFrame(rows, columns=[
         "player_id", "availability_status", "availability_note", "availability_code"
     ])
+    # Match the existing predictions dataframe, where player_id is stored as text.
+    result["player_id"] = result["player_id"].astype("string").astype(object)
+    return result
