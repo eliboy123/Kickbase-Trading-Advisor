@@ -1,0 +1,53 @@
+name: Manual Kickbase Bid
+
+on:
+  workflow_dispatch:
+    inputs:
+      player:
+        description: Exact surname of player listed on market
+        required: true
+        type: string
+      amount:
+        description: Total bid in whole EUR
+        required: true
+        type: string
+      mode:
+        description: Preview first or place a real bid
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - place
+      confirmation:
+        description: For live bids type PLACE BID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-kickbase-bid
+  cancel-in-progress: false
+
+jobs:
+  bid:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Check current market and possibly bid
+        env:
+          KICK_USER: ${{ secrets.KICK_USER }}
+          KICK_PASS: ${{ secrets.KICK_PASS }}
+          PLAYER: ${{ inputs.player }}
+          AMOUNT: ${{ inputs.amount }}
+          MODE: ${{ inputs.mode }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          python scripts/market_bid.py --player "$PLAYER" --amount "$AMOUNT" --mode "$MODE" --confirmation "$CONFIRMATION"
